@@ -22,7 +22,7 @@ void yyerror (char*);
 }
 
 %token <string> ARG
-%token PIPE AND OR SEQ APPEND OUTPUT INPUT ERROR PLAIN VOID
+%token PIPE AND OR SEQ APPEND OUTPUT INPUT ERROR PLAIN VOID BGPROC
 
 %type <cmd> single line mods
 %type <args> args
@@ -113,6 +113,7 @@ op      : PIPE { $$ = C_PIPE; }
 	| OR   { $$ = C_OR;   }
 
 uop     : SEQ { $$ = C_USEQ; }
+  | BGPROC { $$ = C_BGPROC; }
 
 %%
 

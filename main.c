@@ -207,6 +207,10 @@ int execute (struct cmd *cmd)
         restore_redirects(save_stdin, save_stdout, save_stderr);
         return WEXITSTATUS(status);
 
+      case C_BGPROC:
+        errmsg("background not implemented yet :(");
+        return -1;
+
 		errmsg("I do not know how to do this, please help me!");
 		return -1;
 	}

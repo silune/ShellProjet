@@ -20,6 +20,7 @@
 ">"             { return OUTPUT; }
 "<"             { return INPUT; }
 "2>"            { return ERROR; }
+"&"             { return BGPROC; }
 
 [0-9A-z*?/.-]*  {
 		  yylval.string = strdup(yytext);
