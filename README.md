@@ -13,3 +13,6 @@ Some Bash builtin feature are missing : here there is only
  - ```job``` (including ```jobs```, ```fg```, ```bg```)
 
 Job implementation is just a try and might be not complete (or even buggy ...)
+ ---
+I have tried multpile times to implement background process lauch using '&' but I should modify the whole code to proprely handle C_VOID case.
+Here you can only set process in the background one by one using ```bg``` command, the parenthesis doesn't represent as one process but are just considered in the right order.
