@@ -26,7 +26,7 @@ void yyerror (char*);
 
 %type <cmd> single line mods
 %type <args> args
-%type <token> op dir
+%type <token> op uop dir
 %type <arglist> arglist
 
 %left AND OR PIPE
@@ -44,6 +44,12 @@ line    : single
 		$$->left = $1;
 		$$->right = $3;
 	  }
+  | single uop
+    {
+    $$ = calloc(1, sizeof(struct cmd));
+    $$->type = $2;
+    $$->left = $1;
+    }
 
 
 single  : args mods
@@ -105,6 +111,8 @@ op      : PIPE { $$ = C_PIPE; }
 	| AND  { $$ = C_AND;  }
 	| SEQ  { $$ = C_SEQ;  }
 	| OR   { $$ = C_OR;   }
+
+uop     : SEQ { $$ = C_USEQ; }
 
 %%
 

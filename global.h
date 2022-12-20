@@ -1,4 +1,4 @@
-typedef enum { C_PLAIN, C_VOID, C_AND, C_OR, C_PIPE, C_SEQ } cmdtype;
+typedef enum { C_PLAIN, C_VOID, C_AND, C_OR, C_PIPE, C_SEQ, C_USEQ } cmdtype;
 
 struct cmd {
 	int type;

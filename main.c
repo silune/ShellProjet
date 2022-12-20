@@ -154,6 +154,10 @@ int execute (struct cmd *cmd)
         execute_simple(cmd->right, &status);
         return WEXITSTATUS(status);
 
+      case C_USEQ:
+        execute_simple(cmd->left, &status);
+        return WEXITSTATUS(status);
+
 	    case C_AND:
         execute_simple(cmd->left, &status);
         if (WEXITSTATUS(status) == 0) {
