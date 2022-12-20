@@ -158,24 +158,25 @@ void print_process (struct jobstk* jobs_stack, struct process *proc) {
       status_name = "Unkonwn";
       break;
   }
-  char stack_status;
+  char stack_status = ' ';
   if (proc == jobs_stack->top) {
     stack_status = '+';
   }
   else if (proc == jobs_stack->top->next) {
     stack_status = '-';
   }
-  else {
-    stack_status = ' ';
+  char is_bakground = ' ';
+  if (proc->status == 1) {
+    is_bakground = '&';
   }
-  printf(" [%d]%c %s \t\t %s\n", proc->proc_id, stack_status, status_name, proc->proc_name);
+  printf(" [%d]%c %s\t\t %s %c\n", proc->proc_id, stack_status, status_name, proc->proc_name, is_bakground);
 }
 
 void refresh_process(struct jobstk* jobs_stack, struct process *proc, int print_ended)
 {
   int status;
-  waitpid(proc->group_id, &status, WNOHANG | WUNTRACED);
-  if (WIFEXITED(status)) {
+  int pid = waitpid(proc->group_id, &status, WUNTRACED | WNOHANG);
+  if (pid != 0 && WIFEXITED(status)) {
     proc->status = 3;
     if (print_ended) {
       print_process(jobs_stack, proc);
@@ -270,8 +271,8 @@ int continue_bg_proc(struct process *proc)
     return -1;
   }
   printf(" [%d] %s &\n", proc->proc_id, proc->proc_name);
-  kill(- proc->group_id, SIGCONT);
   proc->status = 1;
+  kill(- proc->group_id, SIGCONT);
   return 0;
 }
 

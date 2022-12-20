@@ -5,6 +5,11 @@ CC = gcc -g -Wall
 LINK = $(CC)
 LIBS = -lreadline
 
+all: fake_edit shell
+
+fake_edit:
+	touch main.c
+
 shell: $(OBJECTS)
 	$(LINK) $(OBJECTS) -o $@ $(LIBS)
 
@@ -21,10 +26,14 @@ lex.c: lex.l
 	flex -o$@ lex.l
 
 #test
-test:
-	gcc slow.c -o slow
-	gcc slow_fail.c -o slow
-	gcc rl_test.c -lreadline -o rl_test
+
+test: fake_edit_test
+	gcc test/slow.c -o test/slow
+	gcc test/slow_fail.c -o test/slow_fail
+	gcc test/rl_test.c -lreadline -o test/rl_test
+
+fake_edit_test:
+	touch test/slow.c
 
 # clean
 
