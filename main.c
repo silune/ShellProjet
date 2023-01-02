@@ -15,7 +15,7 @@
 // This is the file that you should work on.
 
 // declaration
-int execute (struct cmd *cmd);
+int execute (struct cmd *cmd, int group);
 
 // name of the program, to be printed in several places
 #define NAME "myshell"
@@ -28,7 +28,7 @@ void errmsg (char *msg)
 }
 
 
-
+int max_length_cmd = 40;
 int pid;
 int fg_group = -1;
 int terminal_fd;
@@ -103,12 +103,22 @@ void pause_process() {
   }
 }
 
+void launch_new_proc (char* name, int pid, int *status)
+{
+    int group = pid;
+    fg_group = group;
+    setpgid(pid, group);
+    push_foreground(pid, terminal_attr);
+    struct process* proc = add_new_proc_jobstk(main_jobs_stack, group, name);
+    wait_for_proc(main_jobs_stack, proc, status); // also gives back terminal to current shell
+}
+
 // This function is the only one who fork and prevent fromdoing useless child of child
-void execute_simple (struct cmd *cmd, int *status)
+void execute_simple (struct cmd *cmd, int *status, int group)
 {
   // not appropriate case
   if (cmd->type != C_PLAIN) {
-    *status = execute(cmd);
+    *status = execute(cmd, group);
     return;
   }
   // builtin case
@@ -121,56 +131,58 @@ void execute_simple (struct cmd *cmd, int *status)
   pid = fork();
   if (pid == 0) {
     //chil process
-    fg_group = getpid();
-    setpgid(0, 0);
-    push_foreground(fg_group, terminal_attr);
-
+    if (group == -1) {
+      group = getpid();
+      fg_group = group;
+      push_foreground(group, terminal_attr);
+    }
+    setpgid(0, group);
     apply_redirects(cmd);
-
     execvp(cmd->args[0], cmd->args);
     fprintf(stderr, "%s : command not found\n", cmd->args[0]);
     exit(-1);
   }
   //parent process
-  fg_group = pid;
-  setpgid(pid, pid);
-  push_foreground(pid, terminal_attr);
-          
-  struct process* proc = add_new_proc_jobstk(main_jobs_stack, fg_group, cmd->args[0]);
-  wait_for_proc(main_jobs_stack, proc, status); // also gives back terminal to current shell
+  if (group == -1) {
+    launch_new_proc(cmd->args[0], pid, status);
+  }
+  else {
+    setpgid(pid, group);
+    waitpid(pid, NULL, WUNTRACED);
+  }
 }
 
-int execute (struct cmd *cmd)
+int execute (struct cmd *cmd, int group)
 {
   int status;
 	switch (cmd->type)
 	{
 	    case C_PLAIN:
-        execute_simple(cmd, &status);
-        return WEXITSTATUS(status);
+        execute_simple(cmd, &status, group);
+        return status;
 
 	    case C_SEQ:
-        execute_simple(cmd->left, &status);
-        execute_simple(cmd->right, &status);
-        return WEXITSTATUS(status);
+        execute_simple(cmd->left, &status, group);
+        execute_simple(cmd->right, &status, group);
+        return status;
 
       case C_USEQ:
-        execute_simple(cmd->left, &status);
-        return WEXITSTATUS(status);
+        execute_simple(cmd->left, &status, group);
+        return status;
 
 	    case C_AND:
-        execute_simple(cmd->left, &status);
+        execute_simple(cmd->left, &status, group);
         if (WEXITSTATUS(status) == 0) {
-          execute_simple(cmd->right, &status);
+          execute_simple(cmd->right, &status, group);
         }
-        return WEXITSTATUS(status);
+        return status;
 
 	    case C_OR:
-        execute_simple(cmd->left, &status);
+        execute_simple(cmd->left, &status, group);
         if (WEXITSTATUS(status)) {
-          execute_simple(cmd->right, &status);
+          execute_simple(cmd->right, &status, group);
         }
-        return WEXITSTATUS(status);
+        return status;
 
 	    case C_PIPE:
         int tube[2];
@@ -179,7 +191,7 @@ int execute (struct cmd *cmd)
         if (pid == 0) {
           //child sub pipe process
           dup2(tube[1], 1);
-          exit(execute(cmd->left));
+          exit(execute(cmd->left, group));
         }
         else {
           close(tube[1]);
@@ -188,7 +200,7 @@ int execute (struct cmd *cmd)
           if (pid == 0) {
             //child main process
             dup2(tube[0], 0);
-            exit(execute(cmd->right));
+            exit(execute(cmd->right, group));
           }
           else {
             //parent process
@@ -196,16 +208,35 @@ int execute (struct cmd *cmd)
             wait(&status);
           }
         }
-        return WEXITSTATUS(status);
+        return status;
 
 	    case C_VOID:
-        int save_stdin = dup(0);
-        int save_stdout = dup(1);
-        int save_stderr = dup(2);
-        apply_redirects(cmd);
-        execute_simple(cmd->left, &status);
-        restore_redirects(save_stdin, save_stdout, save_stderr);
-        return WEXITSTATUS(status);
+        pid = fork();
+        if (pid == 0) {
+          //child process
+          signal(SIGTSTP, SIG_DFL);
+          apply_redirects(cmd);
+          if (group == -1) {
+            group = getpid();
+            fg_group = group;
+            push_foreground(group, terminal_attr);
+          }
+          execute_simple(cmd->left, &status, group);
+          exit(status);
+        }
+        if (group == -1) {
+          launch_new_proc("complex job", pid, &status);
+        }
+        else {
+          waitpid(pid, NULL, WUNTRACED);
+        }
+        //int save_stdin = dup(0);
+        //int save_stdout = dup(1);
+        //int save_stderr = dup(2);
+        //apply_redirects(cmd);
+        //execute_simple(cmd->left, &status);
+        //restore_redirects(save_stdin, save_stdout, save_stderr);
+        return status;
 
       case C_BGPROC:
         errmsg("background not implemented yet :(");
@@ -224,7 +255,7 @@ int main (int argc, char **argv)
 {
   //signals
   signal(SIGINT, reset);
-  signal(SIGTSTP, SIG_IGN);
+  signal(SIGTSTP, pause_process);
   signal(SIGTTOU, SIG_IGN);
 
   terminal_fd = tcgetpgrp(0);
@@ -239,11 +270,11 @@ int main (int argc, char **argv)
 
 	while (1)
 	{
-    signal(SIGTSTP, SIG_IGN);
     do_pause = 0;
 
 		char *line = readline(prompt);
 		if (!line) break;	// user pressed Ctrl+D; quit shell
+    refresh_jobstk(main_jobs_stack, 0);
 		if (!*line) continue;	// empty line
 
 		add_history (line);	// add line to history
@@ -252,10 +283,9 @@ int main (int argc, char **argv)
 		if (!cmd) continue;	// some parse error occurred; ignore
 		//output(cmd,0);	// activate this for debugging
     
-    signal(SIGTSTP, pause_process);
     do_pause = 1;
-    execute(cmd);
-    refresh_jobstk(main_jobs_stack, 0);
+    fg_group = -1;
+    execute(cmd, fg_group);
 	}
 
   free_jobstk(main_jobs_stack);
