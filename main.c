@@ -71,6 +71,7 @@ void restore_redirects (int save_stdin, int save_stdout, int save_stderr)
 
 void push_foreground(int pid, struct termios terminal_state)
 {
+  fg_group = pid;
   terminal_fd = tcgetpgrp(0);
   tcgetattr(0, &terminal_attr);
   tcsetpgrp(0, pid);
@@ -131,6 +132,7 @@ void execute_simple (struct cmd *cmd, int *status, int group)
   pid = fork();
   if (pid == 0) {
     //chil process
+    signal(SIGTSTP, SIG_DFL);
     if (group == -1) {
       group = getpid();
       fg_group = group;
@@ -148,7 +150,11 @@ void execute_simple (struct cmd *cmd, int *status, int group)
   }
   else {
     setpgid(pid, group);
-    waitpid(pid, NULL, WUNTRACED);
+    int waitTillExited;
+    do {
+      waitpid(pid, &waitTillExited, WUNTRACED);
+    } while (! WIFEXITED(waitTillExited));
+    printf("oof\n");
   }
 }
 
@@ -219,6 +225,7 @@ int execute (struct cmd *cmd, int group)
           if (group == -1) {
             group = getpid();
             fg_group = group;
+            setpgid(0, group);
             push_foreground(group, terminal_attr);
           }
           execute_simple(cmd->left, &status, group);

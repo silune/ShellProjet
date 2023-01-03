@@ -258,7 +258,7 @@ int continue_fg_proc(struct jobstk *jobs_stack, struct process *proc)
       return -1;
   }
   printf("%s\n", proc->proc_name);
-  push_foreground(proc->proc_id, *proc->terminal_state);
+  push_foreground(proc->group_id, *proc->terminal_state);
   kill(- proc->group_id, SIGCONT);
   proc->status = 1;
   return 0;
