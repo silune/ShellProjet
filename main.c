@@ -114,6 +114,37 @@ void launch_new_proc (char* name, int pid, int *status)
     wait_for_proc(main_jobs_stack, proc, status); // also gives back terminal to current shell
 }
 
+int set_up_child(int group)
+{
+  signal(SIGTSTP, SIG_DFL);
+  if (group == -1) {
+    group = getpid();
+    fg_group = group;
+    push_foreground(group, terminal_attr);
+  }
+  setpgid(0, group);
+  return group;
+}
+
+void set_up_parent(int child_pid, int group, char* proc_name, int* status)
+{
+  if (group == -1) {
+    group = child_pid;
+    fg_group = group;
+    setpgid(child_pid, group);
+    push_foreground(child_pid, terminal_attr);
+    struct process* proc = add_new_proc_jobstk(main_jobs_stack, group, proc_name);
+    wait_for_proc(main_jobs_stack, proc, status); // also gives back terminal to current shell
+  }
+  else {
+    setpgid(child_pid, group);
+    int waitTillExited;
+    do {
+      waitpid(child_pid, &waitTillExited, WUNTRACED);
+    } while (! WIFEXITED(waitTillExited));
+  }
+}
+
 // This function is the only one who fork and prevent fromdoing useless child of child
 void execute_simple (struct cmd *cmd, int *status, int group)
 {
@@ -132,30 +163,14 @@ void execute_simple (struct cmd *cmd, int *status, int group)
   pid = fork();
   if (pid == 0) {
     //chil process
-    signal(SIGTSTP, SIG_DFL);
-    if (group == -1) {
-      group = getpid();
-      fg_group = group;
-      push_foreground(group, terminal_attr);
-    }
-    setpgid(0, group);
+    group = set_up_child(group);
     apply_redirects(cmd);
     execvp(cmd->args[0], cmd->args);
     fprintf(stderr, "%s : command not found\n", cmd->args[0]);
     exit(-1);
   }
   //parent process
-  if (group == -1) {
-    launch_new_proc(cmd->args[0], pid, status);
-  }
-  else {
-    setpgid(pid, group);
-    int waitTillExited;
-    do {
-      waitpid(pid, &waitTillExited, WUNTRACED);
-    } while (! WIFEXITED(waitTillExited));
-    printf("oof\n");
-  }
+  set_up_parent(pid, group, cmd->args[0], status);
 }
 
 int execute (struct cmd *cmd, int group)
@@ -220,29 +235,11 @@ int execute (struct cmd *cmd, int group)
         pid = fork();
         if (pid == 0) {
           //child process
-          signal(SIGTSTP, SIG_DFL);
-          apply_redirects(cmd);
-          if (group == -1) {
-            group = getpid();
-            fg_group = group;
-            setpgid(0, group);
-            push_foreground(group, terminal_attr);
-          }
+          group = set_up_child(group);
           execute_simple(cmd->left, &status, group);
           exit(status);
         }
-        if (group == -1) {
-          launch_new_proc("complex job", pid, &status);
-        }
-        else {
-          waitpid(pid, NULL, WUNTRACED);
-        }
-        //int save_stdin = dup(0);
-        //int save_stdout = dup(1);
-        //int save_stderr = dup(2);
-        //apply_redirects(cmd);
-        //execute_simple(cmd->left, &status);
-        //restore_redirects(save_stdin, save_stdout, save_stderr);
+        set_up_parent(pid, group, "complex job", &status);
         return status;
 
       case C_BGPROC:
