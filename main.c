@@ -104,44 +104,39 @@ void pause_process() {
   }
 }
 
-void launch_new_proc (char* name, int pid, int *status)
-{
-    int group = pid;
-    fg_group = group;
-    setpgid(pid, group);
-    push_foreground(pid, terminal_attr);
-    struct process* proc = add_new_proc_jobstk(main_jobs_stack, group, name);
-    wait_for_proc(main_jobs_stack, proc, status); // also gives back terminal to current shell
-}
-
-int set_up_child(int group)
+int set_up_child(int group, int foreground)
 {
   signal(SIGTSTP, SIG_DFL);
   if (group == -1) {
     group = getpid();
-    fg_group = group;
-    push_foreground(group, terminal_attr);
+    if (foreground) {
+      push_foreground(group, terminal_attr);
+    }
   }
   setpgid(0, group);
   return group;
 }
 
-void set_up_parent(int child_pid, int group, char* proc_name, int* status)
+void set_up_parent(int child_pid, int group, char* proc_name, int* status, int foreground)
 {
   if (group == -1) {
     group = child_pid;
-    fg_group = group;
     setpgid(child_pid, group);
-    push_foreground(child_pid, terminal_attr);
     struct process* proc = add_new_proc_jobstk(main_jobs_stack, group, proc_name);
-    wait_for_proc(main_jobs_stack, proc, status); // also gives back terminal to current shell
+    if (foreground) {
+      push_foreground(child_pid, terminal_attr);
+      fg_group = group;
+      wait_for_proc(main_jobs_stack, proc, status); // also gives back terminal to current shell
+    }
   }
   else {
     setpgid(child_pid, group);
-    int waitTillExited;
-    do {
-      waitpid(child_pid, &waitTillExited, WUNTRACED);
-    } while (! WIFEXITED(waitTillExited));
+    if (foreground) {
+      int waitTillExited;
+      do {
+        waitpid(child_pid, &waitTillExited, WUNTRACED);
+      } while (! WIFEXITED(waitTillExited));
+    }
   }
 }
 
@@ -163,14 +158,14 @@ void execute_simple (struct cmd *cmd, int *status, int group)
   pid = fork();
   if (pid == 0) {
     //chil process
-    group = set_up_child(group);
+    group = set_up_child(group, 1);
     apply_redirects(cmd);
     execvp(cmd->args[0], cmd->args);
     fprintf(stderr, "%s : command not found\n", cmd->args[0]);
     exit(-1);
   }
   //parent process
-  set_up_parent(pid, group, cmd->args[0], status);
+  set_up_parent(pid, group, cmd->args[0], status, 1);
 }
 
 int execute (struct cmd *cmd, int group)
@@ -235,16 +230,23 @@ int execute (struct cmd *cmd, int group)
         pid = fork();
         if (pid == 0) {
           //child process
-          group = set_up_child(group);
+          group = set_up_child(group, 1);
           execute_simple(cmd->left, &status, group);
           exit(status);
         }
-        set_up_parent(pid, group, "complex job", &status);
+        set_up_parent(pid, group, "complex job", &status, 1);
         return status;
 
       case C_BGPROC:
-        errmsg("background not implemented yet :(");
-        return -1;
+        pid = fork();
+        if (pid == 0) {
+          //child process
+          group = set_up_child(group, 0);
+          execute_simple(cmd->left, &status, group);
+          exit(status);
+        }
+        set_up_parent(pid, group, "complex background job", &status, 0);
+        return status;
 
 		errmsg("I do not know how to do this, please help me!");
 		return -1;
@@ -269,13 +271,13 @@ int main (int argc, char **argv)
   using_history();
 
 	char *prompt = malloc(strlen(NAME)+3);
-	printf("welcome to %s!\n", NAME);
+	printf("welcome to %s %d!\n", NAME, getpid());
 	sprintf(prompt,"%s> ", NAME);
 
 	while (1)
 	{
     do_pause = 0;
-
+    printf("eee %d\n", getpid());
 		char *line = readline(prompt);
 		if (!line) break;	// user pressed Ctrl+D; quit shell
     refresh_jobstk(main_jobs_stack, 0);
@@ -293,6 +295,6 @@ int main (int argc, char **argv)
 	}
 
   free_jobstk(main_jobs_stack);
-	printf("goodbye!\n");
+	printf("goodbye! %d\n", getpid());
 	return 0;
 }
