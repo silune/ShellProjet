@@ -271,13 +271,12 @@ int main (int argc, char **argv)
   using_history();
 
 	char *prompt = malloc(strlen(NAME)+3);
-	printf("welcome to %s %d!\n", NAME, getpid());
+	printf("welcome to %s!\n", NAME);
 	sprintf(prompt,"%s> ", NAME);
 
 	while (1)
 	{
     do_pause = 0;
-    printf("eee %d\n", getpid());
 		char *line = readline(prompt);
 		if (!line) break;	// user pressed Ctrl+D; quit shell
     refresh_jobstk(main_jobs_stack, 0);
@@ -295,6 +294,6 @@ int main (int argc, char **argv)
 	}
 
   free_jobstk(main_jobs_stack);
-	printf("goodbye! %d\n", getpid());
+	printf("goodbye!\n");
 	return 0;
 }

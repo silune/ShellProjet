@@ -224,7 +224,7 @@ struct process* add_new_proc_jobstk (struct jobstk *jobs_stack, int group_id, ch
   }
   new_proc->proc_id = proc_id;
   new_proc->proc_name = proc_name;
-  new_proc->status = 0;
+  new_proc->status = 1;
   new_proc->terminal_state = malloc(sizeof(struct termios));
   tcgetattr(0, new_proc->terminal_state);
   new_proc->next = jobs_stack->top;
