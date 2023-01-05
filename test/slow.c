@@ -4,7 +4,7 @@
 
 int main() {
   for (int i = 0; i < 5; i++) {
-    printf("Beep Boop ... (%d, %d)\n", getpid(), getpgid(getpid()));
+    printf("Beep Boop ...\n");
     sleep(1);
   }
   return 0;

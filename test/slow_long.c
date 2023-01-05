@@ -3,10 +3,9 @@
 #include<stdlib.h>
 
 int main() {
-  for (int i = 0; i < 5; i++) {
+  for (int i = 0; i < 10; i++) {
     printf("Beep Boop ...\n");
     sleep(1);
   }
-  exit(EXIT_FAILURE);
-  return 1;
+  return 0;
 }

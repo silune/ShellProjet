@@ -4,9 +4,7 @@
 
 int main() {
   for (int i = 0; i < 5; i++) {
-    printf("Beep Boop ...\n");
     sleep(1);
   }
-  exit(EXIT_FAILURE);
-  return 1;
+  return 0;
 }
