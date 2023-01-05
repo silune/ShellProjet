@@ -73,7 +73,7 @@ Some examples of command to understand my implementation :
 
 ### Job implementation
 
- - (CTRL-Z) ```./slow``` and then CTRL-Z :
+ - (CTRL-Z) ```./slow``` and then `CTRL-Z` :
  When executing a command I put all children in a same process group and save that process group id on a stack struct I implemented. When a command is executed, the global variable `fg_group` is updated with the current group process ID. When pressing `CTRL-Z` a signal `SIGTSTP` is send to this group, the state of the group is refreshed in the stack, the shell state is saved. Because the child exited, the shell is refreshed to its default state.
 
  - (command `jobs`) : ```jobs``` :
@@ -86,4 +86,5 @@ Some examples of command to understand my implementation :
  This command is parsed in a `C_BGPROC` command type and simply execute the command but doesnot wait for the child to exit.
 
 WARNING : I did not check for the conflict in using pipe in background process so I am not sure of the result os such command.
+
 The test : I implemented some tests of program that run slowly in order to test Job implementation.
