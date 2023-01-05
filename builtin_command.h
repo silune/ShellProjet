@@ -122,7 +122,7 @@ int builtin_command(struct cmd *cmd)
   int save_stdin = dup(0);
   int save_stdout = dup(1);
   int save_stderr = dup(2);
-  apply_redirects(cmd);
+  int fd = apply_redirects(cmd);
   int res;
   if (strcmp(cmd->args[0], "cd") == 0) {
     res = cd_command(cmd);
@@ -144,5 +144,8 @@ int builtin_command(struct cmd *cmd)
     res = -1;
   }
   restore_redirects(save_stdin, save_stdout, save_stderr);
+  if (fd >= 0) {
+    close(fd);
+  }
   return res;
 }

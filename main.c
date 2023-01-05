@@ -42,24 +42,29 @@ struct termios terminal_attr;
 // append is like output but the file should be extended rather
 // than overwritten.
 
-void apply_redirects (struct cmd *cmd)
+int apply_redirects (struct cmd *cmd)
 {
   if (cmd->append != NULL) {
     int new_dir = open(cmd->append, O_WRONLY | O_APPEND | O_CREAT, 0644);
     dup2(new_dir, 1);
+    return new_dir;
   }
   if (cmd->output != NULL) {
     int new_dir = open(cmd->output, O_WRONLY | O_TRUNC | O_CREAT, 0644);
     dup2(new_dir, 1);
+    return new_dir;
   }
   if (cmd->input != NULL) {
     int new_dir = open(cmd->input, O_RDONLY);
     dup2(new_dir, 0);
+    return new_dir;
   }
   if (cmd->error != NULL) {
     int new_dir = open(cmd->error, O_WRONLY | O_TRUNC | O_CREAT, 0644);
     dup2(new_dir, 2);
+    return new_dir;
   }
+  return -1;
 } 
 
 void restore_redirects (int save_stdin, int save_stdout, int save_stderr)
