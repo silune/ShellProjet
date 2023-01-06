@@ -172,6 +172,7 @@ void print_process (struct jobstk* jobs_stack, struct process *proc) {
   printf(" [%d]%c %s\t\t %s %c\n", proc->proc_id, stack_status, status_name, proc->proc_name, is_bakground);
 }
 
+//actualise un processus (vérifie si il est terminé)
 void refresh_process(struct jobstk* jobs_stack, struct process *proc, int print_ended)
 {
   int status;
@@ -184,6 +185,7 @@ void refresh_process(struct jobstk* jobs_stack, struct process *proc, int print_
   }
 }
 
+//actualise la pile : print tous si 'printing', print que ceux terminés sinon
 void refresh_jobstk(struct jobstk *jobs_stack, int printing)
 {
   int visited = 0;
@@ -209,7 +211,7 @@ void refresh_jobstk(struct jobstk *jobs_stack, int printing)
 
 // ---------- GESTION DES PROCESSUS ----------
 
-// ajoute un processus en tant que "Init..." à la pile
+// ajoute un processus en tant que "Running" à la pile
 struct process* add_new_proc_jobstk (struct jobstk *jobs_stack, int group_id, char* proc_name)
 {
   struct process* new_proc = malloc(sizeof(struct process));
@@ -276,7 +278,7 @@ int continue_bg_proc(struct process *proc)
   return 0;
 }
 
-//attends un processus
+//attends un processus et redonne la main au terminal
 void wait_for_proc (struct jobstk* jobs_stack, struct process* proc, int *status)
 {
   waitpid(proc->group_id, status, WUNTRACED);

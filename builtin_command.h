@@ -1,4 +1,4 @@
-
+// renvoie 1 si la command est un des builtin listé ci dessous
 int is_builtin_command(struct cmd *cmd)
 {
   return (strcmp(cmd->args[0], "cd") == 0 ||
@@ -8,6 +8,7 @@ int is_builtin_command(struct cmd *cmd)
           strcmp(cmd->args[0], "bg") == 0);
 }
 
+// execute la commande cd
 int cd_command(struct cmd *cmd)
 {
   //chdir
@@ -26,6 +27,7 @@ int cd_command(struct cmd *cmd)
   return 0;
 }
 
+// exeecute la command history
 int history_command(struct cmd *cmd)
 {
   //check error
@@ -52,6 +54,7 @@ int history_command(struct cmd *cmd)
   return 0;
 }
 
+// execute la command jobs
 int jobs_command(struct cmd *cmd)
 {
   if (cmd->args[1] == NULL) {
@@ -77,6 +80,7 @@ int jobs_command(struct cmd *cmd)
   return 0;
 }
 
+//execute la command fg
 int fg_command(struct cmd *cmd)
 {
   if (main_jobs_stack->nb_proc == 0) {
@@ -100,6 +104,7 @@ int fg_command(struct cmd *cmd)
   return WEXITSTATUS(status);
 }
 
+//execute la command bg
 int bg_command(struct cmd *cmd)
 {
   if (main_jobs_stack->nb_proc == 0) {
@@ -117,6 +122,7 @@ int bg_command(struct cmd *cmd)
   return continue_bg_proc(proc);
 }
 
+//execute une commande 'builtin'
 int builtin_command(struct cmd *cmd)
 {
   int save_stdin = dup(0);

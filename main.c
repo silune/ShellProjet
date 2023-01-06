@@ -28,11 +28,10 @@ void errmsg (char *msg)
 }
 
 
-int max_length_cmd = 40;
-int pid;
-int fg_group = -1;
-int terminal_fd;
-struct termios terminal_attr;
+int pid; //pid pour les forks
+int fg_group = -1; //pid du group de premier plan
+int terminal_fd; //file descriptor du terminal de premier plan
+struct termios terminal_attr; //attributs du terminal de premier plan
 
 
 
@@ -42,6 +41,7 @@ struct termios terminal_attr;
 // append is like output but the file should be extended rather
 // than overwritten.
 
+// effectue les redirections, renvoie le file descriptor du fichier ouvert ou -1 si pas de redirections
 int apply_redirects (struct cmd *cmd)
 {
   if (cmd->append != NULL) {
@@ -67,6 +67,7 @@ int apply_redirects (struct cmd *cmd)
   return -1;
 } 
 
+// a partir de la sauvegarde des fd, dup2 sur les entrées / sorties standard
 void restore_redirects (int save_stdin, int save_stdout, int save_stderr)
 {
   dup2(save_stdin, 0);
@@ -74,6 +75,7 @@ void restore_redirects (int save_stdin, int save_stdout, int save_stderr)
   dup2(save_stderr, 2);
 }
 
+// positionne un groupe au premier plan
 void push_foreground(int pid, struct termios terminal_state)
 {
   fg_group = pid;
@@ -86,13 +88,9 @@ void push_foreground(int pid, struct termios terminal_state)
 #include "job.h"
 #include "builtin_command.h"
 
-
-// The function execute() takes a command parsed at the command line.
-// The structure of the command is explained in output.c.
-// Returns the exit code of the command in question.
-
 //signal handlers
 
+//reset terminal to default state
 void reset() {
   rl_crlf();
   rl_reset_line_state();
@@ -102,13 +100,19 @@ void reset() {
 
 int do_pause = 0;
 
+//pause de foreground process
 void pause_process() {
-  if (do_pause) {
+  if (do_pause && fg_group > 0) {
     do_pause = 0;
     kill(-fg_group, SIGTSTP);
   }
 }
 
+// The function execute() takes a command parsed at the command line.
+// The structure of the command is explained in output.c.
+// Returns the exit code of the command in question.
+
+//set up a child process group
 int set_up_child(int group, int foreground)
 {
   signal(SIGTSTP, SIG_DFL);
@@ -122,6 +126,7 @@ int set_up_child(int group, int foreground)
   return group;
 }
 
+//set up a parent process group and wait for its child
 void set_up_parent(int child_pid, int group, char* proc_name, int* status, int foreground)
 {
   if (group == -1) {
@@ -145,63 +150,49 @@ void set_up_parent(int child_pid, int group, char* proc_name, int* status, int f
   }
 }
 
-// This function is the only one who fork and prevent fromdoing useless child of child
-void execute_simple (struct cmd *cmd, int *status, int group)
-{
-  // not appropriate case
-  if (cmd->type != C_PLAIN) {
-    *status = execute(cmd, group);
-    return;
-  }
-  // builtin case
-  if (is_builtin_command(cmd)) {
-    *status = builtin_command(cmd);
-    return;
-  }
-
-  //general case
-  pid = fork();
-  if (pid == 0) {
-    //chil process
-    group = set_up_child(group, 1);
-    apply_redirects(cmd);
-    execvp(cmd->args[0], cmd->args);
-    fprintf(stderr, "%s : command not found\n", cmd->args[0]);
-    exit(-1);
-  }
-  //parent process
-  set_up_parent(pid, group, cmd->args[0], status, 1);
-}
-
 int execute (struct cmd *cmd, int group)
 {
   int status;
 	switch (cmd->type)
 	{
 	    case C_PLAIN:
-        execute_simple(cmd, &status, group);
+        //builtin case
+        if (is_builtin_command(cmd)) {
+         return builtin_command(cmd);
+        }
+        //general case
+        pid = fork();
+        if (pid == 0) {
+        //chil process
+        group = set_up_child(group, 1);
+        apply_redirects(cmd);
+        execvp(cmd->args[0], cmd->args);
+        fprintf(stderr, "%s : command not found\n", cmd->args[0]);
+        exit(-1);
+        }
+        //parent process
+        set_up_parent(pid, group, cmd->args[0], &status, 1);
         return status;
 
 	    case C_SEQ:
-        execute_simple(cmd->left, &status, group);
-        execute_simple(cmd->right, &status, group);
+        execute(cmd->left, group);
+        status = execute(cmd->right, group);
         return status;
 
       case C_USEQ:
-        execute_simple(cmd->left, &status, group);
-        return status;
+        return execute(cmd->left, group);
 
 	    case C_AND:
-        execute_simple(cmd->left, &status, group);
+        status = execute(cmd->left, group);
         if (WEXITSTATUS(status) == 0) {
-          execute_simple(cmd->right, &status, group);
+          status = execute(cmd->right, group);
         }
         return status;
 
 	    case C_OR:
-        execute_simple(cmd->left, &status, group);
+        status = execute(cmd->left, group);
         if (WEXITSTATUS(status)) {
-          execute_simple(cmd->right, &status, group);
+          status = execute(cmd->right, group);
         }
         return status;
 
@@ -236,7 +227,7 @@ int execute (struct cmd *cmd, int group)
         if (pid == 0) {
           //child process
           group = set_up_child(group, 1);
-          execute_simple(cmd->left, &status, group);
+          status = execute(cmd->left, group);
           exit(status);
         }
         set_up_parent(pid, group, "complex job", &status, 1);
@@ -247,7 +238,7 @@ int execute (struct cmd *cmd, int group)
         if (pid == 0) {
           //child process
           group = set_up_child(group, 0);
-          execute_simple(cmd->left, &status, group);
+          status = execute(cmd->left, group);
           exit(status);
         }
         set_up_parent(pid, group, "complex background job", &status, 0);
