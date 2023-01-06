@@ -85,6 +85,9 @@ Some examples of command to understand my implementation :
  - (start background process `&`) : ```./slox &``` :
  This command is parsed in a `C_BGPROC` command type and simply execute the command but doesnot wait for the child to exit.
 
-WARNING : I did not check for the conflict in using pipe in background process so I am not sure of the result os such command.
+## PS
 
-The test : I implemented some tests of program that run slowly in order to test Job implementation.
+- I did not check for the conflict in using pipe in background process so I am not sure of the result os such command.
+- I modified the lexer to accept `@`, `-` and `&` symbols
+- I modified the parser to parse `cmd ;` and `cmd &` expressions
+- The test : I implemented some tests of program that run slowly in order to test Job implementation.

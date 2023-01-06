@@ -286,7 +286,8 @@ int main (int argc, char **argv)
     
     do_pause = 1;
     fg_group = -1;
-    execute(cmd, fg_group);
+    int i = execute(cmd, fg_group);
+    printf("hehehehe : %d\n", i);
 	}
 
   free_jobstk(main_jobs_stack);
